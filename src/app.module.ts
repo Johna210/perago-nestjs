@@ -3,8 +3,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { UserEntity } from './entities/user.entity';
 import { PhotoEntity } from './entities/photo.entity';
+import { OrganizationModule } from './organization/organization.module';
+import { OrganizationEntity } from './entities/organization.entity';
 
 @Module({
   imports: [
@@ -15,17 +16,16 @@ import { PhotoEntity } from './entities/photo.entity';
       username: 'postgres',
       password: 'root',
       database: 'orga_structure',
-      entities: [UserEntity, PhotoEntity],
+      entities: [OrganizationEntity, PhotoEntity],
       synchronize: true,
     }),
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {
   constructor(private dataSource: DataSource) {
-console.log(dataSource.toString())
-
+    console.log(dataSource.toString());
   }
-
 }
