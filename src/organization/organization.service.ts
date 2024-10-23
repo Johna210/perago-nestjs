@@ -1,26 +1,42 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrganizationEntity } from 'src/entities/organization.entity';
-import { Repository } from 'typeorm';
+import { Repository, TreeRepository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 
 @Injectable()
 export class OrganizationService {
   constructor(
     @InjectRepository(OrganizationEntity)
-    private organizationRepository: Repository<OrganizationEntity>,
+    private organizationRepository: TreeRepository<OrganizationEntity>,
   ) {}
 
+  // Helper functions
+  async findRole(role: string) {
+    return await this.organizationRepository.findOneBy({ role });
+  }
+
+  async returnTree(node: OrganizationEntity) {
+    if (!node) {
+      throw new BadRequestException("role doesn't exist");
+    }
+    return await this.organizationRepository.findDescendantsTree(node);
+  }
+
+  // ....
+
   async getOrganization() {
-    return await this.organizationRepository.find();
+    return await this.organizationRepository.findTrees();
   }
 
   async getUserById(id: string) {
-    return await this.organizationRepository.findOneBy({ id: id });
+    const node = await this.organizationRepository.findOneBy({ id });
+    return this.returnTree(node);
   }
 
   async getUserByRole(role: string) {
-    return await this.organizationRepository.findOneBy({ role });
+    const node = await this.findRole(role);
+    return this.returnTree(node);
   }
 
   async insertRole(user: CreateUserDto) {
@@ -35,7 +51,7 @@ export class OrganizationService {
         throw new BadRequestException('Invalid user format');
       }
     } else if (user.role === 'CEO') {
-      const userFound = await this.getUserByRole('CEO');
+      const userFound = await this.findRole('CEO');
 
       if (userFound) {
         throw new BadRequestException('User can not be this role');
