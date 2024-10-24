@@ -10,8 +10,8 @@ export class CreateUserDto {
   description: string;
 
   @IsString()
-  @IsOptional()
-  role: string = '';
+  @IsNotEmpty()
+  role: string;
 
   @IsString()
   @IsOptional()

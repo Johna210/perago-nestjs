@@ -1,3 +1,4 @@
+import { IsNotEmpty } from 'class-validator';
 import {
   Entity,
   Column,
@@ -13,9 +14,11 @@ export class OrganizationEntity {
   id: string;
 
   @Column()
+  @IsNotEmpty()
   name: string;
 
   @Column()
+  @IsNotEmpty()
   role: string;
 
   @Column()

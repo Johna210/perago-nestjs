@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrganizationEntity } from 'src/entities/organization.entity';
-import { Repository, TreeRepository } from 'typeorm';
+import { TreeRepository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Injectable()
 export class OrganizationService {
@@ -18,7 +19,7 @@ export class OrganizationService {
 
   async returnTree(node: OrganizationEntity) {
     if (!node) {
-      throw new BadRequestException("role doesn't exist");
+      throw new BadRequestException("user doesn't exist");
     }
     return await this.organizationRepository.findDescendantsTree(node);
   }
@@ -40,25 +41,16 @@ export class OrganizationService {
   }
 
   async insertRole(user: CreateUserDto) {
-    if (!user.role || user.role == '') {
-      // 1. Check if the db is empty
-      const org = await this.getOrganization();
-
-      // 2. If its empty make the first user the ceo
-      if (org.length === 0) {
-        user.role = 'CEO';
-      } else {
-        throw new BadRequestException('Invalid user format');
-      }
-    } else if (user.role === 'CEO') {
+    if (user.role === 'CEO') {
       const userFound = await this.findRole('CEO');
 
       if (userFound) {
         throw new BadRequestException('User can not be this role');
       }
+    } else if (!user.reportTo) {
+      throw new BadRequestException('User should report to a role.');
     }
 
-    // 4. Check validity of the user and save.
     const parentEntity = user.reportTo
       ? await this.getUserById(user.reportTo)
       : null;
@@ -71,6 +63,41 @@ export class OrganizationService {
       role: user.role,
     });
 
-    return this.organizationRepository.save(newUser);
+    return await this.organizationRepository.save(newUser);
+  }
+
+  async updateUserInfo(id: string, user: UpdateUserDto) {
+    const userFound = await this.organizationRepository.findOneBy({ id });
+
+    if (!userFound) {
+      throw new BadRequestException("user doesn't exist");
+    }
+
+    if (user.reportTo) {
+      if (id === user.reportTo) {
+        throw new BadRequestException('user cannot report to itself');
+      }
+
+      const newParent = await this.getUserById(user.reportTo);
+      userFound.parent = newParent;
+    }
+
+    // Update only the provided fields
+    Object.assign(userFound, user);
+
+    return this.returnTree(await this.organizationRepository.save(userFound));
+  }
+
+  async getUserChildren(id: string) {
+    const userFound = await this.organizationRepository.findOneBy({ id });
+
+    if (!userFound) {
+      throw new BadRequestException("user doesn't exist");
+    }
+
+    const children = await this.organizationRepository.findDescendants(
+      userFound,
+    );
+    return children.slice(1);
   }
 }
