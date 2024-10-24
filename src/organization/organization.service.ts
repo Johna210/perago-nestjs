@@ -31,7 +31,11 @@ export class OrganizationService {
   }
 
   async getUserById(id: string) {
-    const node = await this.organizationRepository.findOneBy({ id });
+    const node = await this.organizationRepository.findOne({
+      where: { id },
+      relations: ['parent'],
+    });
+
     return this.returnTree(node);
   }
 
@@ -99,5 +103,40 @@ export class OrganizationService {
       userFound,
     );
     return children.slice(1);
+  }
+
+  async deleteUser(id: string) {
+    // Find the user to delete
+    const user = await this.organizationRepository.findOne({
+      where: { id },
+      relations: ['parent'],
+    });
+
+    if (!user) {
+      throw new BadRequestException("user doesn't exist");
+    }
+    console.log(user);
+    console.log(user.parent);
+
+    // Get the parent's reference
+    const parent = user.parent;
+
+    // Check if the user has no parent (indicating a root user)
+    if (!parent) {
+      throw new BadRequestException('Cannot delete root user');
+    }
+
+    // Get the children of the user
+    const userChildren = await this.getUserChildren(id);
+
+    // If there are children, reassign them to the parent
+    if (userChildren.length > 0) {
+      for (let child of userChildren) {
+        child.parent = parent;
+        await this.organizationRepository.save(child);
+      }
+    }
+
+    await this.organizationRepository.remove(user);
   }
 }

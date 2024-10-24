@@ -46,8 +46,11 @@ export class OrganizationController {
     return this.organizationService.updateUserInfo(id, user);
   }
 
+  // Delete user Bty ID
   @Delete(':id')
-  deleteUser(@Param('id') id: string) {}
+  deleteUser(@Param('id') id: string) {
+    return this.organizationService.deleteUser(id);
+  }
 
   // Get User Childrens By ID
   @Get('children/:id')
