@@ -10,13 +10,21 @@ import {
 import { OrganizationService } from './organization.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OrganizationDto } from './dto/organization.dto';
 
+@ApiTags('organization')
 @Controller('organization')
 export class OrganizationController {
   constructor(private organizationService: OrganizationService) {}
 
   // Get whole organization structure
   @Get()
+  @ApiOperation({ summary: 'Returns the whole organization structure' })
+  @ApiOkResponse({
+    description: 'List the organization successfully',
+    type: OrganizationDto,
+  })
   async getOrganization() {
     return await this.organizationService.getOrganization();
   }
@@ -46,7 +54,7 @@ export class OrganizationController {
     return this.organizationService.updateUserInfo(id, user);
   }
 
-  // Delete user Bty ID
+  // Delete user By ID
   @Delete(':id')
   deleteUser(@Param('id') id: string) {
     return this.organizationService.deleteUser(id);

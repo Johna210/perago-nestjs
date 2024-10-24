@@ -23,7 +23,6 @@ export class OrganizationService {
     }
     return await this.organizationRepository.findDescendantsTree(node);
   }
-
   // ....
 
   async getOrganization() {
