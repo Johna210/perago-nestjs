@@ -10,7 +10,15 @@ import {
 import { OrganizationService } from './organization.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { OrganizationDto } from './dto/organization.dto';
 
 @ApiTags('organization')
@@ -31,6 +39,14 @@ export class OrganizationController {
 
   // Insert New Role
   @Post()
+  @ApiOperation({ summary: 'Create a new user in the organization' })
+  @ApiCreatedResponse({
+    description: 'Returns 201 created after inserting the new user',
+    type: OrganizationDto,
+  })
+  @ApiBadRequestResponse({
+    description: 'Bad request.',
+  })
   createRole(@Body() user: CreateUserDto) {
     user.role = user.role.toUpperCase();
     return this.organizationService.insertRole(user);
@@ -38,30 +54,66 @@ export class OrganizationController {
 
   // Get User By ID
   @Get('/:id')
+  @ApiOperation({ summary: 'Get user by ID' })
+  @ApiParam({ name: 'id', description: 'Unique Identifier of the user' })
+  @ApiResponse({
+    status: 200,
+    description: 'User found',
+    type: OrganizationDto,
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
   getUserById(@Param('id') id: string) {
     return this.organizationService.getUserById(id);
   }
 
   // Get User By role
   @Get('role/:role')
+  @ApiOperation({ summary: 'Get user by role' })
+  @ApiParam({ name: 'role', description: 'Role of the user' })
+  @ApiResponse({
+    status: 200,
+    description: 'User found',
+    type: OrganizationDto,
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
   getUserByRole(@Param('role') role: string) {
     return this.organizationService.getUserByRole(role.toUpperCase());
   }
 
   // Update user info
   @Patch(':id')
+  @ApiOperation({ summary: 'Update user info' })
+  @ApiParam({ name: 'id', description: 'Unique Identifier of the user' })
+  @ApiResponse({
+    status: 200,
+    description: 'User updated',
+    type: OrganizationDto,
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
   updateUserInfo(@Param('id') id: string, @Body() user: UpdateUserDto) {
     return this.organizationService.updateUserInfo(id, user);
   }
 
   // Delete user By ID
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete user by ID' })
+  @ApiParam({ name: 'id', description: 'Unique Identifier of the user' })
+  @ApiResponse({ status: 200, description: 'User deleted' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   deleteUser(@Param('id') id: string) {
     return this.organizationService.deleteUser(id);
   }
 
   // Get User Childrens By ID
   @Get('children/:id')
+  @ApiOperation({ summary: 'Get user children by ID' })
+  @ApiParam({ name: 'id', description: 'Unique Identifier of the user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Children found',
+    type: [OrganizationDto],
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
   getUserChildrens(@Param('id') id: string) {
     return this.organizationService.getUserChildren(id);
   }

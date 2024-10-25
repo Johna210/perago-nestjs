@@ -18,14 +18,14 @@ export class OrganizationDto {
 
   @ApiProperty({
     description: 'The List of organization that are under this role',
-    type: OrganizationDto,
+    type: () => OrganizationDto,
     isArray: true,
   })
   children: OrganizationDto[];
 
   @ApiProperty({
     description: 'The parent of the role',
-    type: OrganizationDto,
+    type: () => OrganizationDto,
     nullable: true,
   })
   parent: OrganizationDto;
