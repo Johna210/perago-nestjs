@@ -25,11 +25,11 @@ export class OrganizationService {
   }
   // ....
 
-  async getOrganization() {
+  async getOrganization(): Promise<OrganizationEntity[]> {
     return await this.organizationRepository.findTrees();
   }
 
-  async getUserById(id: string) {
+  async getUserById(id: string): Promise<OrganizationEntity> {
     const node = await this.organizationRepository.findOne({
       where: { id },
       relations: ['parent'],
@@ -66,7 +66,8 @@ export class OrganizationService {
       role: user.role,
     });
 
-    return await this.organizationRepository.save(newUser);
+    await this.organizationRepository.save(newUser);
+    return await this.getOrganization();
   }
 
   async updateUserInfo(id: string, user: UpdateUserDto) {
@@ -95,7 +96,7 @@ export class OrganizationService {
     const userFound = await this.organizationRepository.findOneBy({ id });
 
     if (!userFound) {
-      throw new BadRequestException("user doesn't exist");
+      throw new BadRequestException('User not found');
     }
 
     const children = await this.organizationRepository.findDescendants(
@@ -112,10 +113,8 @@ export class OrganizationService {
     });
 
     if (!user) {
-      throw new BadRequestException("user doesn't exist");
+      throw new BadRequestException('User not found');
     }
-    console.log(user);
-    console.log(user.parent);
 
     // Get the parent's reference
     const parent = user.parent;
@@ -137,5 +136,6 @@ export class OrganizationService {
     }
 
     await this.organizationRepository.remove(user);
+    return await this.getOrganization();
   }
 }

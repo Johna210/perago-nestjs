@@ -45,7 +45,10 @@ export class OrganizationController {
     type: OrganizationDto,
   })
   @ApiBadRequestResponse({
-    description: 'Bad request.',
+    description: 'When user wants to be a ceo and there already is one.',
+  })
+  @ApiBadRequestResponse({
+    description: 'When user doesnt report to any role.',
   })
   createRole(@Body() user: CreateUserDto) {
     user.role = user.role.toUpperCase();
