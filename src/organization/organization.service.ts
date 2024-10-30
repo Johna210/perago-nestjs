@@ -75,38 +75,50 @@ export class OrganizationService {
   }
 
   async updateUserInfo(id: string, user: UpdateUserDto) {
+    let userToUpdate: OrganizationEntity;
+    let newParent: OrganizationEntity | null = null;
+
     // Check if `reportTo` is valid and doesn’t cause circular reporting
     if (user.reportTo) {
       if (id === user.reportTo) {
         throw new BadRequestException('User cannot report to itself');
       }
 
-      // Ensure `reportTo` exists in the database
-      const newParent = await this.getUserById(user.reportTo);
-      if (!newParent) {
-        throw new BadRequestException('Invalid `reportTo` user');
+      // Ensure `reportTo` exists in the database and fetch the user in one query
+      [userToUpdate, newParent] = await Promise.all([
+        this.getUserById(id),
+        this.getUserById(user.reportTo),
+      ]);
+
+      // Check if the new parent id is the children of the current id.
+      if (newParent.parent.id === id) {
+        throw new BadRequestException('Children cannot be a new parent.');
       }
 
-      // Set the `reportTo` relationship by updating `parentId` directly
-      user.reportTo = newParent.id;
-
-      console.log('Reached in the if clause');
+      // Update the parent relationship
+      userToUpdate.parent = newParent;
+    } else {
+      userToUpdate = await this.getUserById(id);
     }
 
     // Remove undefined and empty values for cleaner updates
     const updatePayload = Object.fromEntries(
       Object.entries(user).filter(
-        ([_, value]) => value !== undefined && value !== '',
+        ([key, value]) =>
+          value !== undefined && value !== '' && key !== 'reportTo',
       ),
     );
 
-    // Check if `updatePayload` has any fields to update
-    if (Object.keys(updatePayload).length === 0) {
+    // Only throw an error if there are no fields to update and no `reportTo`
+    if (Object.keys(updatePayload).length === 0 && !user.reportTo) {
       throw new BadRequestException('No valid fields provided for update');
     }
 
-    // Perform a direct update without loading the entity
-    return await this.organizationRepository.update(id, updatePayload);
+    // Merge other updates into the user entity
+    Object.assign(userToUpdate, updatePayload);
+
+    // Save the updated user with `reportTo` and any other fields
+    return await this.organizationRepository.save(userToUpdate);
   }
 
   async getUserChildren(id: string) {
