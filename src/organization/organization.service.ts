@@ -13,17 +13,21 @@ export class OrganizationService {
   ) {}
 
   // Helper functions
-  async findRole(role: string) {
+  private async findRootRole() {
+    return this.organizationRepository.findRoots();
+  }
+
+  private async findRole(role: string) {
     return await this.organizationRepository.findOneBy({ role });
   }
 
-  async returnTree(node: OrganizationEntity) {
+  private async returnTree(node: OrganizationEntity) {
     if (!node) {
-      throw new BadRequestException("user doesn't exist");
+      throw new BadRequestException('User not found');
     }
     return await this.organizationRepository.findDescendantsTree(node);
   }
-  // ....
+  // ......
 
   async getOrganization(): Promise<OrganizationEntity[]> {
     return await this.organizationRepository.findTrees();
@@ -35,74 +39,92 @@ export class OrganizationService {
       relations: ['parent'],
     });
 
-    return this.returnTree(node);
+    return node;
   }
 
   async getUserByRole(role: string) {
     const node = await this.findRole(role);
-    return this.returnTree(node);
+    if (!node) {
+      return new BadRequestException('Role not found');
+    }
+    return node;
   }
 
   async insertRole(user: CreateUserDto) {
-    if (user.role === 'CEO') {
-      const userFound = await this.findRole('CEO');
+    const [rootRole, parentEntity] = await Promise.all([
+      this.findRootRole(),
+      user.reportTo ? this.getUserById(user.reportTo) : Promise.resolve(null),
+    ]);
 
-      if (userFound) {
-        throw new BadRequestException('User can not be this role');
-      }
-    } else if (!user.reportTo) {
-      throw new BadRequestException('User should report to a role.');
+    if (user.role === rootRole[0].role) {
+      throw new BadRequestException('User cannot be this role');
     }
 
-    const parentEntity = user.reportTo
-      ? await this.getUserById(user.reportTo)
-      : null;
+    if (!user.reportTo) {
+      throw new BadRequestException('User should report to a role.');
+    }
 
     const newUser = this.organizationRepository.create({
       name: user.name,
       description: user.description,
-      children: [],
       parent: parentEntity,
       role: user.role,
     });
 
-    await this.organizationRepository.save(newUser);
-    return await this.getOrganization();
+    return await this.organizationRepository.save(newUser);
   }
 
   async updateUserInfo(id: string, user: UpdateUserDto) {
-    const userFound = await this.organizationRepository.findOneBy({ id });
-
-    if (!userFound) {
-      throw new BadRequestException("user doesn't exist");
-    }
-
+    // Check if `reportTo` is valid and doesn’t cause circular reporting
     if (user.reportTo) {
       if (id === user.reportTo) {
-        throw new BadRequestException('user cannot report to itself');
+        throw new BadRequestException('User cannot report to itself');
       }
 
+      // Ensure `reportTo` exists in the database
       const newParent = await this.getUserById(user.reportTo);
-      userFound.parent = newParent;
+      if (!newParent) {
+        throw new BadRequestException('Invalid `reportTo` user');
+      }
+
+      // Set the `reportTo` relationship by updating `parentId` directly
+      user.reportTo = newParent.id;
+
+      console.log('Reached in the if clause');
     }
 
-    // Update only the provided fields
-    Object.assign(userFound, user);
+    // Remove undefined and empty values for cleaner updates
+    const updatePayload = Object.fromEntries(
+      Object.entries(user).filter(
+        ([_, value]) => value !== undefined && value !== '',
+      ),
+    );
 
-    return this.returnTree(await this.organizationRepository.save(userFound));
+    // Check if `updatePayload` has any fields to update
+    if (Object.keys(updatePayload).length === 0) {
+      throw new BadRequestException('No valid fields provided for update');
+    }
+
+    // Perform a direct update without loading the entity
+    return await this.organizationRepository.update(id, updatePayload);
   }
 
   async getUserChildren(id: string) {
+    // Find the user by ID
     const userFound = await this.organizationRepository.findOneBy({ id });
 
+    // Check if the user exists
     if (!userFound) {
       throw new BadRequestException('User not found');
     }
 
-    const children = await this.organizationRepository.findDescendants(
-      userFound,
-    );
-    return children.slice(1);
+    // Retrieve direct children
+    const children = await this.organizationRepository
+      .createQueryBuilder('organization')
+      .where('organization.parentId = :id', { id })
+      .getMany();
+
+    return children;
   }
 
   async deleteUser(id: string) {
@@ -135,7 +157,6 @@ export class OrganizationService {
       }
     }
 
-    await this.organizationRepository.remove(user);
-    return await this.getOrganization();
+    return await this.organizationRepository.remove(user);
   }
 }

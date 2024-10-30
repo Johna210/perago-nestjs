@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -20,6 +21,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { OrganizationDto } from './dto/organization.dto';
+import { validate as validateUuid } from 'uuid';
 
 @ApiTags('organization')
 @Controller('organization')
@@ -50,9 +52,9 @@ export class OrganizationController {
   @ApiBadRequestResponse({
     description: 'When user doesnt report to any role.',
   })
-  createRole(@Body() user: CreateUserDto) {
+  async createRole(@Body() user: CreateUserDto) {
     user.role = user.role.toUpperCase();
-    return this.organizationService.insertRole(user);
+    return await this.organizationService.insertRole(user);
   }
 
   // Get User By ID
@@ -65,8 +67,8 @@ export class OrganizationController {
     type: OrganizationDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  getUserById(@Param('id') id: string) {
-    return this.organizationService.getUserById(id);
+  async getUserById(@Param('id') id: string) {
+    return await this.organizationService.getUserById(id);
   }
 
   // Get User By role
@@ -79,8 +81,8 @@ export class OrganizationController {
     type: OrganizationDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  getUserByRole(@Param('role') role: string) {
-    return this.organizationService.getUserByRole(role.toUpperCase());
+  async getUserByRole(@Param('role') role: string) {
+    return await this.organizationService.getUserByRole(role.toUpperCase());
   }
 
   // Update user info
@@ -93,8 +95,11 @@ export class OrganizationController {
     type: OrganizationDto,
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  updateUserInfo(@Param('id') id: string, @Body() user: UpdateUserDto) {
-    return this.organizationService.updateUserInfo(id, user);
+  async updateUserInfo(@Param('id') id: string, @Body() user: UpdateUserDto) {
+    if (!validateUuid(id)) {
+      throw new BadRequestException('Invalid uuid as an id');
+    }
+    return await this.organizationService.updateUserInfo(id, user);
   }
 
   // Delete user By ID
@@ -103,8 +108,11 @@ export class OrganizationController {
   @ApiParam({ name: 'id', description: 'Unique Identifier of the user' })
   @ApiResponse({ status: 200, description: 'User deleted' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  deleteUser(@Param('id') id: string) {
-    return this.organizationService.deleteUser(id);
+  async deleteUser(@Param('id') id: string) {
+    if (!validateUuid(id)) {
+      throw new BadRequestException('Invalid uuid as an id');
+    }
+    return await this.organizationService.deleteUser(id);
   }
 
   // Get User Childrens By ID
@@ -117,7 +125,10 @@ export class OrganizationController {
     type: [OrganizationDto],
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  getUserChildrens(@Param('id') id: string) {
-    return this.organizationService.getUserChildren(id);
+  async getUserChildrens(@Param('id') id: string) {
+    if (!validateUuid(id)) {
+      throw new BadRequestException('Invalid uuid as an id');
+    }
+    return await this.organizationService.getUserChildren(id);
   }
 }

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -28,6 +28,7 @@ export class CreateUserDto {
 
   @IsString()
   @IsOptional()
+  @IsUUID()
   @ApiProperty({
     description: 'The userid that the user reports to',
     type: String,
