@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -34,4 +41,9 @@ export class CreateUserDto {
     type: String,
   })
   reportTo?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsObject({ each: true })
+  children?: CreateUserDto[];
 }

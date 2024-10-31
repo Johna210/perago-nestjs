@@ -78,7 +78,26 @@ export class OrganizationService {
       role: user.role,
     });
 
-    return await this.organizationRepository.save(newUser);
+    const savedUser = await this.organizationRepository.save(newUser);
+
+    // If there are children, create and associate them with the new user
+    if (user.children && user.children.length > 0) {
+      const childrenEntities = user.children.map((child) => {
+        return this.organizationRepository.create({
+          name: child.name,
+          description: child.description,
+          parent: savedUser,
+          role: child.role,
+        });
+      });
+
+      await this.organizationRepository.save(childrenEntities);
+
+      return {
+        message: 'User and children successfully created',
+        user: savedUser.id,
+      };
+    }
   }
 
   async updateUserInfo(id: string, user: UpdateUserDto) {
