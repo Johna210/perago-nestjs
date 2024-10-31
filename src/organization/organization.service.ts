@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrganizationEntity } from 'src/entities/organization.entity';
-import { TreeRepository } from 'typeorm';
+import { InsertResult, TreeRepository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
@@ -39,13 +39,17 @@ export class OrganizationService {
       relations: ['parent'],
     });
 
+    if (!node) {
+      throw new BadRequestException('User with this id not found');
+    }
+
     return node;
   }
 
-  async getUserByRole(role: string) {
+  async getUserByRole(role: string): Promise<OrganizationEntity> {
     const node = await this.findRole(role);
     if (!node) {
-      return new BadRequestException('Role not found');
+      throw new BadRequestException('Role not found');
     }
     return node;
   }
@@ -56,11 +60,14 @@ export class OrganizationService {
       user.reportTo ? this.getUserById(user.reportTo) : Promise.resolve(null),
     ]);
 
-    if (user.role === rootRole[0].role) {
-      throw new BadRequestException('User cannot be this role');
+    // If there is a root role and if the root role is the same as the input
+    if (rootRole.length && user.role === rootRole[0].role) {
+      throw new BadRequestException(
+        'User cannot have the same role as the root',
+      );
     }
 
-    if (!user.reportTo) {
+    if (rootRole.length !== 0 && !user.reportTo) {
       throw new BadRequestException('User should report to a role.');
     }
 
@@ -75,8 +82,8 @@ export class OrganizationService {
   }
 
   async updateUserInfo(id: string, user: UpdateUserDto) {
-    let userToUpdate: OrganizationEntity;
-    let newParent: OrganizationEntity | null = null;
+    // Prepare the update payload
+    const updatePayload: Partial<OrganizationEntity> = {};
 
     // Check if `reportTo` is valid and doesn’t cause circular reporting
     if (user.reportTo) {
@@ -85,40 +92,31 @@ export class OrganizationService {
       }
 
       // Ensure `reportTo` exists in the database and fetch the user in one query
-      [userToUpdate, newParent] = await Promise.all([
-        this.getUserById(id),
-        this.getUserById(user.reportTo),
-      ]);
+      const newParent = await this.getUserById(user.reportTo);
 
       // Check if the new parent id is the children of the current id.
       if (newParent.parent.id === id) {
         throw new BadRequestException('Children cannot be a new parent.');
       }
 
-      // Update the parent relationship
-      userToUpdate.parent = newParent;
-    } else {
-      userToUpdate = await this.getUserById(id);
+      // Set the new parent entity in the update payload
+      updatePayload.parent = newParent;
     }
 
-    // Remove undefined and empty values for cleaner updates
-    const updatePayload = Object.fromEntries(
-      Object.entries(user).filter(
-        ([key, value]) =>
-          value !== undefined && value !== '' && key !== 'reportTo',
-      ),
-    );
+    // Add other fields to the update payload, filtering out undefined and empty values
+    Object.entries(user).forEach(([key, value]) => {
+      if (value !== undefined && value !== '' && key !== 'reportTo') {
+        updatePayload[key] = value;
+      }
+    });
 
     // Only throw an error if there are no fields to update and no `reportTo`
     if (Object.keys(updatePayload).length === 0 && !user.reportTo) {
       throw new BadRequestException('No valid fields provided for update');
     }
 
-    // Merge other updates into the user entity
-    Object.assign(userToUpdate, updatePayload);
-
-    // Save the updated user with `reportTo` and any other fields
-    return await this.organizationRepository.save(userToUpdate);
+    // Execute the update with the complete payload, including the parent if set
+    return await this.organizationRepository.update(id, updatePayload);
   }
 
   async getUserChildren(id: string) {
@@ -140,33 +138,32 @@ export class OrganizationService {
   }
 
   async deleteUser(id: string) {
-    // Find the user to delete
+    // Find the user to delete along with their parent and children in one query
     const user = await this.organizationRepository.findOne({
       where: { id },
-      relations: ['parent'],
+      relations: ['parent', 'children'],
     });
+
+    console.log(user);
 
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
-    // Get the parent's reference
-    const parent = user.parent;
-
     // Check if the user has no parent (indicating a root user)
-    if (!parent) {
-      throw new BadRequestException('Cannot delete root user');
+    if (!user.parent && !user.children) {
+      throw new BadRequestException('Cannot delete root user with children');
     }
 
-    // Get the children of the user
-    const userChildren = await this.getUserChildren(id);
+    // Reassign children to the parent in one go
+    if (user.children && user.children.length > 0) {
+      const updatedChildren = user.children.map((child) => {
+        child.parent = user.parent;
+        return child;
+      });
 
-    // If there are children, reassign them to the parent
-    if (userChildren.length > 0) {
-      for (let child of userChildren) {
-        child.parent = parent;
-        await this.organizationRepository.save(child);
-      }
+      // Perform bulk update of children
+      await this.organizationRepository.save(updatedChildren); // Save all updated children in a single call
     }
 
     return await this.organizationRepository.remove(user);
